@@ -18,8 +18,4 @@ num_to_cat_list = conf.num_to_cat
 
 # Convert needed columns to categories
 all_data_cat = convert_clomuns_to_category(all_data, num_to_cat_list)
-
-one_hot_encoder = OneHotEncoder(handle_unknown='ignore')
-
-train_encoded = cat_to_one(one_hot_encoder, all_data_cat, num_to_cat_list)
-print(train_encoded.head())
+print(all_data_cat.head())
