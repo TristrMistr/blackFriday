@@ -16,6 +16,12 @@ all_data = pd.concat([train.drop(['Purchase'], axis=1), test])
 # List of all columns that need convering to categorical variables
 num_to_cat_list = conf.num_to_cat
 
+# Convert all NAs to 0 in product categories as it means they are part of no group
+all_data_no_null = na_to_zero(all_data, conf.na_to_zero)
+
+# Convert the product2 and 3 columns to int as now there are no NAs
+all_data_int = convert_to_type(all_data_no_null, conf.na_to_zero, "int")
+
 # Convert needed columns to categories
-all_data_cat = convert_clomuns_to_category(all_data, num_to_cat_list)
-print(all_data_cat.head())
+all_data_cat = convert_to_type(all_data, num_to_cat_list, "category")
+print(all_data_cat.tail())
