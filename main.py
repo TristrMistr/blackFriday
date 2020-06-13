@@ -1,5 +1,6 @@
 import pandas as pd
 from sklearn.preprocessing import OneHotEncoder
+from sklearn.preprocessing import LabelEncoder
 from cleaning import *
 import conf
 
@@ -22,6 +23,15 @@ all_data_no_null = na_to_zero(all_data, conf.na_to_zero)
 # Convert the product2 and 3 columns to int as now there are no NAs
 all_data_int = convert_to_type(all_data_no_null, conf.na_to_zero, "int")
 
+# Create a variable that shows how many categories a product is in, assuming NAN means it isnt in a cat
+all_data_int["num_of_cats"] = all_data_int.apply(lambda row: num_of_cats(row), axis=1)
+
 # Convert needed columns to categories
 all_data_cat = convert_to_type(all_data, num_to_cat_list, "category")
-print(all_data_cat.tail())
+
+le = LabelEncoder()
+all_data_labelled = cat_to_label(le, all_data_cat, conf.nominal_cols)
+
+all_data_encoded = make_dummies(all_data_labelled, conf.one_hot_list)
+
+
