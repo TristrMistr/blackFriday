@@ -1,10 +1,14 @@
 import pandas as pd
+from src.conf import *
 
 def convert_to_type(df, cat_list, dtype):
-    for cat in cat_list:
-        df[cat] = df[cat].astype(dtype)
-    
-    return df
+    if dtype in convert_to_type_options:
+        for cat in cat_list:
+            df[cat] = df[cat].astype(dtype)
+        
+        return df
+    else:
+        raise TypeError("Only supported options for dtype are \"integer\" and \"category\"")
 
 def cat_to_one(encoder, df, col_list):
     for col in col_list:

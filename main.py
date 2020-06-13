@@ -1,8 +1,8 @@
 import pandas as pd
 from sklearn.preprocessing import OneHotEncoder
 from sklearn.preprocessing import LabelEncoder
-from cleaning import *
-import conf
+from src.cleaning import *
+import src.conf as conf
 
 # Read in train and test set
 train = pd.read_csv(conf.train_path)
