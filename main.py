@@ -26,14 +26,12 @@ all_data_int = convert_to_type(all_data_no_null, conf.na_to_zero, "int")
 # Create a variable that shows how many categories a product is in, assuming NAN means it isnt in a cat
 all_data_int["num_of_cats"] = all_data_int.apply(lambda row: num_of_cats(row), axis=1)
 
-# Convert needed columns to categories
-all_data_cat = convert_to_type(all_data, num_to_cat_list, "category")
-
 # Label all ordinal variables with integer values
 le = LabelEncoder()
-all_data_labelled = cat_to_label(le, all_data_cat, conf.ordinal_cols)
+all_data_labelled = cat_to_label(le, all_data_int, conf.ordinal_cols)
+
+# Convert needed columns to categories
+all_data_cat = convert_to_type(all_data_labelled, num_to_cat_list, "category")
 
 # Make dummy variables for all nominal variables
-all_data_encoded = make_dummies(all_data_labelled, conf.one_hot_list)
-
-
+all_data_encoded = make_dummies(all_data_cat, conf.one_hot_list)
