@@ -29,9 +29,11 @@ all_data_int["num_of_cats"] = all_data_int.apply(lambda row: num_of_cats(row), a
 # Convert needed columns to categories
 all_data_cat = convert_to_type(all_data, num_to_cat_list, "category")
 
+# Label all ordinal variables with integer values
 le = LabelEncoder()
-all_data_labelled = cat_to_label(le, all_data_cat, conf.nominal_cols)
+all_data_labelled = cat_to_label(le, all_data_cat, conf.ordinal_cols)
 
+# Make dummy variables for all nominal variables
 all_data_encoded = make_dummies(all_data_labelled, conf.one_hot_list)
 
 
