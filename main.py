@@ -3,35 +3,124 @@ from sklearn.preprocessing import OneHotEncoder
 from sklearn.preprocessing import LabelEncoder
 from src.cleaning import *
 import src.conf as conf
+from sklearn.ensemble import RandomForestRegressor
+from sklearn.metrics import mean_squared_error
+from math import sqrt
+from sklearn.model_selection import train_test_split
+from time import time
+from sklearn.model_selection import GridSearchCV
 
-# Read in train and test set
-train = pd.read_csv(conf.train_path)
-test = pd.read_csv(conf.test_path)
+class Pipeline:
+    def __init__(self, forest_parameters={"num_of_trees": 200,
+                                          "max_depth": 8,
+                                          "max_features": "auto",
+                                          "criterion": "mse"},
+                       keep_ordinal = True, 
+                       feature_engineering= True,
+                       tune_parameters = False):
+        self.rmse = -1
+        self.train = pd.read_csv(conf.train_path)
+        self.test = pd.read_csv(conf.test_path)
+        self.forest_parameters = forest_parameters
+        self.keep_ordinal = keep_ordinal
+        self.feature_engineering = feature_engineering
+        self.all = pd.concat([self.train.drop(['Purchase'], axis=1), self.test])
+        self.target = self.train.Purchase
+        self.num_to_cat_list = conf.num_to_cat[self.feature_engineering]
+        self.results = []
+        self.sample_template = self.test.iloc[:,0:2]
+        self.tune_parameters = tune_parameters
 
-# Separate target varibale so can merge all remaining data
-train_target = train.Purchase
+    def clean(self):
+        self.all = na_to_zero(self.all, conf.na_to_zero)
+        self.all = convert_to_type(self.all, conf.na_to_zero, "int")
+        self.all = self.all.iloc[:,2:]
+        self.train = self.all.iloc[0:550068,]
+        self.test = self.all.iloc[550068:,]
 
-# Merge all data for joint data cleaning and feature extraction
-all_data = pd.concat([train.drop(['Purchase'], axis=1), test])
+    def feature_enhancement(self):
+        if self.feature_engineering:
+            self.all["num_of_cats"] = self.all.apply(lambda row: num_of_cats(row), axis=1)
+            self.all["two_cats"] = self.all.apply(lambda row: has_second_cat(row), axis=1)
+            self.all["three_cats"] = self.all.apply(lambda row: has_third_cat(row), axis=1)
 
-# List of all columns that need convering to categorical variables
-num_to_cat_list = conf.num_to_cat
+        if self.keep_ordinal:
+            le = LabelEncoder()
+            self.all = cat_to_label(le, self.all, conf.ordinal_cols)
+        else:
+            self.all = self.all
 
-# Convert all NAs to 0 in product categories as it means they are part of no group
-all_data_no_null = na_to_zero(all_data, conf.na_to_zero)
+        self.all = convert_to_type(self.all, self.num_to_cat_list, "category")
+        self.all = make_dummies(self.all, conf.one_hot_list[self.keep_ordinal])
+        self.train = self.all.iloc[0:550068,]
+        self.test = self.all.iloc[550068:,]
 
-# Convert the product2 and 3 columns to int as now there are no NAs
-all_data_int = convert_to_type(all_data_no_null, conf.na_to_zero, "int")
+    def model(self, tune_parameters):
+        self.train_x, self.val_x, self.train_y, self.val_y = train_test_split(self.train, self.target, test_size=0.3)
 
-# Create a variable that shows how many categories a product is in, assuming NAN means it isnt in a cat
-all_data_int["num_of_cats"] = all_data_int.apply(lambda row: num_of_cats(row), axis=1)
+        if tune_parameters:
+            param_grid = {
+                'n_estimators': [100, 200, 300, 400],
+                'max_features': ['auto', 'sqrt', 'log2'],
+                'max_depth' : [6, 8, 10],
+                'criterion' :['mse', 'mae']
+                }
 
-# Label all ordinal variables with integer values
-le = LabelEncoder()
-all_data_labelled = cat_to_label(le, all_data_int, conf.ordinal_cols)
+            print("Fitting random forest model")
+            regressor = RandomForestRegressor(random_state=42)
+            CV_rfr = GridSearchCV(estimator=regressor, param_grid=param_grid, cv=5)
+            CV_rfr.fit(self.train_x, self.train_y)
+            best_atts = CV_rfr.best_params_
 
-# Convert needed columns to categories
-all_data_cat = convert_to_type(all_data_labelled, num_to_cat_list, "category")
+            self.regressor = RandomForestRegressor(random_state=42, 
+                                                criterion=best_atts['criterion'], 
+                                                max_depth=best_atts['max_depth'],
+                                                n_estimators=best_atts['n_estimators'],
+                                                max_features=best_atts['max_features'])
+        else:
+            self.regressor = RandomForestRegressor(n_estimators=self.forest_parameters["num_of_trees"],
+                                                   max_depth=self.forest_parameters["max_depth"],
+                                                   criterion=self.forest_parameters["criterion"],
+                                                   max_features=self.forest_parameters["max_features"],
+                                                   random_state=42)
 
-# Make dummy variables for all nominal variables
-all_data_encoded = make_dummies(all_data_cat, conf.one_hot_list)
+        self.regressor.fit(self.train_x, self.train_y)
+
+    def fit(self, validation):
+        if validation:
+            print("Random forest now predicting the validation set")
+            y_pred = self.regressor.predict(self.val_x)
+            self.rmse = sqrt(mean_squared_error(y_pred, self.val_y))
+        else:
+            print("Random forest now predicting the test set")
+            self.results = self.regressor.predict(self.test)
+
+    def save_result(self):
+        prediction_df = pd.DataFrame(self.results, columns=["Purchase"])
+        submission = pd.concat([prediction_df, self.sample_template], axis=1)
+        submission.to_csv("submission{}.csv".format(str(self.rmse)))
+
+    def run(self):
+        self.clean()
+        self.feature_enhancement()
+        self.model(self.tune_parameters)
+        self.fit(True)
+
+        f = open("best.txt", "r")
+        best_result = float(f.read())
+        f.close()
+
+        if self.rmse < best_result:
+            print("GOT BEST RESULT, SAVING NEW SUBMISSION")
+            f = open("best.txt", "w")
+            f.write(str(self.rmse))
+            f.close()
+            self.fit(False)
+            self.save_result()
+
+start = time()
+keep_ordinal = Pipeline()
+keep_ordinal.run()
+print(keep_ordinal.rmse)
+end = time()
+print(end - start)
