@@ -12,4 +12,9 @@ one_hot_list = {True: ["Gender", "Occupation", "City_Category", "Marital_Status"
                 False: ["Gender", "Occupation", "City_Category", "Marital_Status", "Age", "Stay_In_Current_City_Years",
                 "Product_Category_1", "Product_Category_2", "Product_Category_3"]}
 na_to_zero = ["Product_Category_2", "Product_Category_3"]
-convert_to_type_options = ["int", "category"]
+convert_to_type_options = ["int", "category", "bool"]
+
+cat_to_num = ["Age", "Stay_In_Current_City_Years", "Product_Category_1", "Product_Category_2", "Product_Category_3",
+              "num_of_cats"]
+
+cat_to_bool = ["two_cats", "three_cats"]
