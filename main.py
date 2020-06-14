@@ -88,11 +88,9 @@ class Pipeline:
 
     def fit(self, validation):
         if validation:
-            print("Random forest now predicting the validation set")
             y_pred = self.regressor.predict(self.val_x)
             self.rmse = sqrt(mean_squared_error(y_pred, self.val_y))
         else:
-            print("Random forest now predicting the test set")
             self.results = self.regressor.predict(self.test)
 
     def save_result(self):
@@ -101,9 +99,13 @@ class Pipeline:
         submission.to_csv("submission{}.csv".format(str(self.rmse)))
 
     def run(self):
+        print("Stage 1 - Cleaning data")
         self.clean()
+        print("Stage 2 - Feature engineering")
         self.feature_enhancement()
+        print("Stage 3 - Training model \n NB If hypertuning this will take a long time")
         self.model(self.tune_parameters)
+        print("Stage 4 - Predicting validation set")
         self.fit(True)
 
         f = open("best.txt", "r")
@@ -111,7 +113,7 @@ class Pipeline:
         f.close()
 
         if self.rmse < best_result:
-            print("GOT BEST RESULT, SAVING NEW SUBMISSION")
+            print("Stage 5 - Found best solution to date, saving results to file")
             f = open("best.txt", "w")
             f.write(str(self.rmse))
             f.close()
