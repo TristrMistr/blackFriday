@@ -46,6 +46,20 @@ def num_of_cats(row):
     else:
         return 3
 
+def has_second_cat(row):
+    if row["Product_Category_2"] != 0:
+        return 1
+    else:
+        return 0
+
+def has_third_cat(row):
+    if row["Product_Category_3"] != 0:
+        return 1
+    else:
+        return 0
+
+    
+
 
 
 
