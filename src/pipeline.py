@@ -9,12 +9,13 @@ from sklearn.model_selection import train_test_split
 from time import time
 from sklearn.model_selection import GridSearchCV
 from src.model import pick_model
+import xgboost as xgb
 
 
 class Pipeline:
     def __init__(self,
-                 forest_parameters={"num_of_trees": 10,
-                                    "max_depth": 5,
+                 forest_parameters={"num_of_trees": 200,
+                                    "max_depth": 10,
                                     "max_features": "auto",
                                     "criterion": "mse"},
                  keep_ordinal=True,
@@ -56,19 +57,45 @@ class Pipeline:
 
         self.all = convert_to_type(self.all, self.num_to_cat_list, "category")
         self.all = make_dummies(self.all, conf.one_hot_list[self.keep_ordinal])
-        if self.model_to_use == "XG":
-            self.all = convert_to_type(self.all, conf.cat_to_bool, "bool")
-            self.all = convert_to_type(self.all, conf.cat_to_num, "int")
+        self.all = convert_to_type(self.all, conf.cat_to_bool, "bool")
+        self.all = convert_to_type(self.all, conf.cat_to_num, "int")
 
         self.train = self.all.iloc[0:550068, ]
         self.test = self.all.iloc[550068:, ]
 
     def model(self, tune_parameters):
         self.train_x, self.val_x, self.train_y, self.val_y = train_test_split(self.train, self.target, test_size=0.3)
-        self.regressor = pick_model(self.train_x, self.train_y, self.model_to_use, self.forest_parameters)
-        self.regressor.fit(self.train_x, self.train_y)
 
-    def fit(self, validation):
+        if self.model_to_use.lower() == "both":
+            self.rf_regressor = RandomForestRegressor(n_estimators=self.forest_parameters["num_of_trees"],
+                                                      max_depth=self.forest_parameters["max_depth"],
+                                                      criterion=self.forest_parameters["criterion"],
+                                                      max_features=self.forest_parameters["max_features"],
+                                                      random_state=42)
+
+            self.xg_regressor = xgb.XGBRegressor(objective='reg:squarederror',
+                                                 colsample_bytree=0.7,
+                                                 learning_rate=0.1,
+                                                 max_depth=10,
+                                                 alpha=10,
+                                                 n_estimators=750)
+
+            # Make the two models
+            self.rf_regressor.fit(self.train_x, self.train_y)
+            self.xg_regressor.fit(self.train_x, self.train_y)
+   
+            # Predict all data points ready for second model
+            rf_pred = self.rf_regressor.predict(self.val_x)
+            xg_pred = self.xg_regressor.predict(self.val_x)
+
+            prediction = ((rf_pred + xg_pred) / 2)
+            self.rmse = sqrt(mean_squared_error(prediction, self.val_y))
+
+        else:
+            self.regressor = pick_model(self.train_x, self.train_y, self.model_to_use, self.forest_parameters)
+            self.regressor.fit(self.train_x, self.train_y)
+
+    def predict(self, validation):
         if validation:
             y_pred = self.regressor.predict(self.val_x)
             self.rmse = sqrt(mean_squared_error(y_pred, self.val_y))
@@ -88,7 +115,9 @@ class Pipeline:
         print("Stage 3 - Training model \n NB If hypertuning this will take a long time")
         self.model(self.tune_parameters)
         print("Stage 4 - Predicting validation set")
-        self.fit(True)
+
+        if not self.model_to_use.lower() == "both":
+            self.predict(True)
 
         f = open("best.txt", "r")
         best_result = float(f.read())
@@ -99,5 +128,11 @@ class Pipeline:
             f = open("best.txt", "w")
             f.write(str(self.rmse))
             f.close()
-            self.fit(False)
+            if not self.model_to_use.lower() == "both":
+                self.predict(False)
+            else:
+                rf_pred = self.rf_regressor.predict(self.test)
+                xg_pred = self.xg_regressor.predict(self.test)
+                self.results = ((rf_pred + xg_pred) / 2)
+
             self.save_result()

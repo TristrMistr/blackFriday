@@ -1,0 +1,6 @@
+min_child_weight: 5
+gamma: 2
+subsample: 1.0
+colsample_bytree: 1.0
+max_depth: 7
+n_estimators: 10
